@@ -249,7 +249,7 @@ static void setup_ap_netif(void) {
     ESP_LOGI(TAG, "AP DHCP range: " IPSTR " - " IPSTR, IP2STR(&lease.start_ip), IP2STR(&lease.end_ip));
 }
 
-// ---------- परफॉर्मेंस ट्यूनिंग ----------
+// ---------- परफॉर्मेंस ट्यूनिंग (🔥 FIX #2: BA_WIN फंक्शन हटाए गए) ----------
 static void apply_performance_tuning(void) {
     esp_wifi_set_ps(WIFI_PS_NONE);
     esp_wifi_set_max_tx_power(80);
@@ -261,9 +261,8 @@ static void apply_performance_tuning(void) {
         if (err_ap != ESP_OK) ESP_LOGW(TAG, "AP HT40 set failed (%d)", err_ap);
         if (err_sta != ESP_OK) ESP_LOGW(TAG, "STA HT40 set failed (%d)", err_sta);
     }
-    esp_wifi_set_rx_ba_win(32);
-    esp_wifi_set_tx_ba_win(32);
-    ESP_LOGI(TAG, "Performance: PS_NONE, Tx=20dBm, BA_WIN=32");
+    // 🔥 BA_WIN अब router_core_init() में cfg के माध्यम से सेट किया जा रहा है
+    ESP_LOGI(TAG, "Performance: PS_NONE, Tx=20dBm, BA_WIN configured via init config");
 }
 
 // ---------- STA रीकनेक्ट टास्क (🔥 FIX #17: sta_connecting फ्लैग चेक करें) ----------
@@ -322,6 +321,9 @@ esp_err_t router_core_init(void) {
     cfg.ampdu_rx_enable    = 1;
     cfg.ampdu_tx_enable    = 1;
     cfg.nvs_enable         = 0;
+    // 🔥 FIX #2: BA_WIN को cfg के माध्यम से सेट करें (ESP-IDF v5.x का सही तरीका)
+    cfg.rx_ba_win = 32;
+    cfg.tx_ba_win = 32;
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
 
     ESP_ERROR_CHECK(esp_event_handler_instance_register(
