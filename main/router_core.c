@@ -3,14 +3,15 @@
 #include "led_status.h"
 #include "esp_wifi.h"
 #include "esp_netif.h"
+#include "esp_netif_net_stack.h"   // 🔥 esp_netif_get_netif_impl के लिए
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_system.h"
 #include "nvs_flash.h"
-#include "esp_mac.h"             // 🔥 MACSTR और MAC2STR के लिए
-#include "lwip/lwip_napt.h"
+#include "esp_mac.h"              // 🔥 MACSTR / MAC2STR के लिए
+#include "lwip/netif.h"           // 🔥 पहले netif.h – struct netif की परिभाषा के लिए
+#include "lwip/lwip_napt.h"       // 🔥 फिर napt.h
 #include "lwip/ip4_addr.h"
-#include "lwip/netif.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
@@ -176,7 +177,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t base,
             atomic_store(&g_router.sta_connected, false);
             
             if (atomic_load(&g_router.nat_enabled)) {
-                // 🔥 CAST जोड़ा गया
+                // 🔥 Cast के साथ सही function call
                 ip_napt_enable_netif((struct netif *)esp_netif_get_netif_impl(s_ap_netif), 0);
                 atomic_store(&g_router.nat_enabled, false);
                 ESP_LOGI(TAG, "NAPT disabled");
@@ -209,7 +210,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t base,
         atomic_store(&sta_connecting, false);
         atomic_store(&g_router.sta_connected, true);
         
-        // 🔥 CAST जोड़ा गया
+        // 🔥 Cast के साथ सही function call
         ip_napt_enable_netif((struct netif *)esp_netif_get_netif_impl(s_ap_netif), 1);
         atomic_store(&g_router.nat_enabled, true);
         ESP_LOGI(TAG, "NAPT enabled");
