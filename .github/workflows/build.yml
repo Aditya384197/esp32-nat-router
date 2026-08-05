@@ -17,15 +17,13 @@ jobs:
       with:
         submodules: 'recursive'
 
-    - name: Setup ESP-IDF
+    - name: Setup ESP-IDF and Build
       uses: espressif/esp-idf-ci-action@v1
       with:
-        esp_idf_version: v5.1.2
-
-    - name: Build Project
-      run: |
-        idf.py set-target esp32
-        idf.py build
+        idf_version: v5.1.2   # <--- बस यहाँ esp_ हटाकर idf_ कर दें
+        command: |
+          idf.py set-target esp32
+          idf.py build
 
     - name: Upload Firmware Artifact
       uses: actions/upload-artifact@v4
