@@ -17,10 +17,9 @@ idf_component_register(
         lwip 
         esp_http_server
         mbedtls
-        driver
+        esp_driver_gpio          # 🔥 यहाँ driver की जगह esp_driver_gpio डालें
 )
 
-# 🔥 ये Flags सभी Warnings को Errors में बदलने से रोकेंगे
 target_compile_options(${COMPONENT_LIB} PRIVATE 
     -Wno-format 
     -Wno-error=unused-variable 
