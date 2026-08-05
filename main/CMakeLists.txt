@@ -2,7 +2,7 @@
 set(COMPONENT_SRCDIRS .)
 set(COMPONENT_ADD_INCLUDEDIRS .)
 
-# यह आपका मूल कोड है (जो आपने पहले मुझे दिया था)
+# यह आपका मूल कोड है (अब esp_http_server के साथ)
 idf_component_register(
     SRCS 
         main.c 
@@ -17,5 +17,5 @@ idf_component_register(
         esp_netif 
         esp_event 
         lwip 
-        http_server
+        esp_http_server    # 🔥 यहाँ बदलाव किया है
 )
