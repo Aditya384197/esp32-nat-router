@@ -3,14 +3,14 @@
 #include "led_status.h"
 #include "esp_wifi.h"
 #include "esp_netif.h"
-#include "esp_netif_net_stack.h"   // 🔥 esp_netif_get_netif_impl के लिए
+#include "esp_netif_net_stack.h"
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_system.h"
 #include "nvs_flash.h"
-#include "esp_mac.h"              // 🔥 MACSTR / MAC2STR के लिए
-#include "lwip/netif.h"           // 🔥 पहले netif.h – struct netif की परिभाषा के लिए
-#include "lwip/lwip_napt.h"       // 🔥 फिर napt.h
+#include "esp_mac.h"
+#include "lwip/netif.h"
+#include "lwip/lwip_napt.h"
 #include "lwip/ip4_addr.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -177,7 +177,6 @@ static void wifi_event_handler(void *arg, esp_event_base_t base,
             atomic_store(&g_router.sta_connected, false);
             
             if (atomic_load(&g_router.nat_enabled)) {
-                // 🔥 Cast के साथ सही function call
                 ip_napt_enable_netif((struct netif *)esp_netif_get_netif_impl(s_ap_netif), 0);
                 atomic_store(&g_router.nat_enabled, false);
                 ESP_LOGI(TAG, "NAPT disabled");
@@ -210,7 +209,6 @@ static void wifi_event_handler(void *arg, esp_event_base_t base,
         atomic_store(&sta_connecting, false);
         atomic_store(&g_router.sta_connected, true);
         
-        // 🔥 Cast के साथ सही function call
         ip_napt_enable_netif((struct netif *)esp_netif_get_netif_impl(s_ap_netif), 1);
         atomic_store(&g_router.nat_enabled, true);
         ESP_LOGI(TAG, "NAPT enabled");
@@ -240,8 +238,9 @@ static void setup_ap_netif(void) {
 static void apply_performance_tuning(void) {
     esp_wifi_set_ps(WIFI_PS_NONE);
     esp_wifi_set_max_tx_power(80);
-    esp_err_t err_ap = esp_wifi_set_bandwidth(WIFI_IF_AP, WIFI_BW_HT40);
-    esp_err_t err_sta = esp_wifi_set_bandwidth(WIFI_IF_STA, WIFI_BW_HT40);
+    // 🔥 नीचे 2 लाइनों में WIFI_BW_HT40 को WIFI_BW40 से बदलें
+    esp_err_t err_ap = esp_wifi_set_bandwidth(WIFI_IF_AP, WIFI_BW40);
+    esp_err_t err_sta = esp_wifi_set_bandwidth(WIFI_IF_STA, WIFI_BW40);
     if (err_ap == ESP_OK && err_sta == ESP_OK)
         ESP_LOGI(TAG, "HT40 enabled on both interfaces");
     else {
