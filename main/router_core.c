@@ -10,7 +10,7 @@
 #include "lwip/lwip_napt.h"
 #include "lwip/ip4_addr.h"
 #include "lwip/netif.h"
-#include "lwip/dhcps.h"          // 🔥 यह Include जोड़ा गया है
+// #include "lwip/dhcps.h"   // ← यह Include हटा दिया गया
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
@@ -220,7 +220,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t base,
     }
 }
 
-// ---------- AP नेटिफ सेटअप ----------
+// ---------- AP नेटिफ सेटअप (DHCP Lease Range हटा दी गई – डिफ़ॉल्ट का उपयोग करें) ----------
 static void setup_ap_netif(void) {
     char ap_ip_buf[16];
     atomic_str_get(g_router.ap_ip, ap_ip_buf, sizeof(ap_ip_buf));
@@ -232,19 +232,9 @@ static void setup_ap_netif(void) {
 
     esp_netif_dhcps_stop(s_ap_netif);
     esp_netif_set_ip_info(s_ap_netif, &ip_info);
-
-    uint32_t ip_addr = ip_info.ip.addr;
-    uint32_t netmask = ip_info.netmask.addr;
-    uint32_t subnet = ip_addr & netmask;
-    uint32_t start = subnet | 2;
-    uint32_t end   = subnet | 254;
-    dhcps_lease_t lease;
-    lease.enable = true;
-    lease.start_ip.addr = start;
-    lease.end_ip.addr   = end;
-    esp_netif_dhcps_option(s_ap_netif, ESP_NETIF_OP_SET, ESP_NETIF_DHCP_IP_ADDRESS, &lease, sizeof(lease));
+    // DHCP Server डिफ़ॉल्ट Lease Range (subnet.2 – subnet.254) स्वतः लागू हो जाती है
     esp_netif_dhcps_start(s_ap_netif);
-    ESP_LOGI(TAG, "AP DHCP range: " IPSTR " - " IPSTR, IP2STR(&lease.start_ip), IP2STR(&lease.end_ip));
+    ESP_LOGI(TAG, "AP DHCP started with default range (based on AP IP)");
 }
 
 // ---------- परफॉर्मेंस ट्यूनिंग ----------
@@ -314,7 +304,7 @@ esp_err_t router_core_init(void) {
     cfg.ampdu_rx_enable    = 1;
     cfg.ampdu_tx_enable    = 1;
     cfg.nvs_enable         = 0;
-    cfg.rx_ba_win = 32;   // केवल rx_ba_win मौजूद है (tx_ba_win हटा दिया)
+    cfg.rx_ba_win = 32;   // केवल rx_ba_win मौजूद है
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
 
     ESP_ERROR_CHECK(esp_event_handler_instance_register(
