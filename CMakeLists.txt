@@ -1,16 +1,3 @@
-idf_component_register(
-    SRCS 
-        main.c 
-        router_core.c 
-        web_ui.c 
-        led_status.c
-    INCLUDE_DIRS 
-        "."
-    PRIV_REQUIRES 
-        nvs_flash 
-        esp_wifi 
-        esp_netif 
-        esp_event 
-        lwip 
-        http_server
-)
+cmake_minimum_required(VERSION 3.5)
+include($ENV{IDF_PATH}/tools/cmake/project.cmake)
+project(esp32_nat_router)
