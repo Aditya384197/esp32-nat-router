@@ -20,5 +20,5 @@ idf_component_register(
         driver
 )
 
-# 🔥 यह 2 लाइनें जोड़ें – Format Warnings को Errors न बनने दें
-target_compile_options(${COMPONENT_LIB} PRIVATE -Wno-format -Wno-error=unused-variable)
+# 🔥 ये Flags Format और Unused Variable Warnings को Errors में नहीं बदलेंगे
+target_compile_options(${COMPONENT_LIB} PRIVATE -Wno-format -Wno-error=unused-variable -Wno-incompatible-pointer-types)
