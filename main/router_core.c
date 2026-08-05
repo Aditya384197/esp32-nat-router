@@ -7,6 +7,7 @@
 #include "esp_log.h"
 #include "esp_system.h"
 #include "nvs_flash.h"
+#include "esp_mac.h"             // 🔥 MACSTR और MAC2STR के लिए
 #include "lwip/lwip_napt.h"
 #include "lwip/ip4_addr.h"
 #include "lwip/netif.h"
@@ -175,7 +176,8 @@ static void wifi_event_handler(void *arg, esp_event_base_t base,
             atomic_store(&g_router.sta_connected, false);
             
             if (atomic_load(&g_router.nat_enabled)) {
-                ip_napt_enable_netif(esp_netif_get_netif_impl(s_ap_netif), 0);
+                // 🔥 CAST जोड़ा गया
+                ip_napt_enable_netif((struct netif *)esp_netif_get_netif_impl(s_ap_netif), 0);
                 atomic_store(&g_router.nat_enabled, false);
                 ESP_LOGI(TAG, "NAPT disabled");
             }
@@ -187,7 +189,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t base,
             atomic_fetch_add(&g_router.sta_clients, 1);
             ESP_LOGI(TAG, "Client joined: " MACSTR " (total %d)",
                      MAC2STR(d->mac), (int)atomic_load(&g_router.sta_clients));
-            (void)d; // unused variable को शांत करें
+            (void)d;
             break;
         }
         case WIFI_EVENT_AP_STADISCONNECTED: {
@@ -196,7 +198,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t base,
                 atomic_fetch_sub(&g_router.sta_clients, 1);
             ESP_LOGI(TAG, "Client left: " MACSTR " (total %d)",
                      MAC2STR(d->mac), (int)atomic_load(&g_router.sta_clients));
-            (void)d; // unused variable को शांत करें
+            (void)d;
             break;
         }
         default: break;
@@ -207,7 +209,8 @@ static void wifi_event_handler(void *arg, esp_event_base_t base,
         atomic_store(&sta_connecting, false);
         atomic_store(&g_router.sta_connected, true);
         
-        ip_napt_enable_netif(esp_netif_get_netif_impl(s_ap_netif), 1);
+        // 🔥 CAST जोड़ा गया
+        ip_napt_enable_netif((struct netif *)esp_netif_get_netif_impl(s_ap_netif), 1);
         atomic_store(&g_router.nat_enabled, true);
         ESP_LOGI(TAG, "NAPT enabled");
         
