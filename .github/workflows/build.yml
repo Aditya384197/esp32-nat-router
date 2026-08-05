@@ -29,5 +29,5 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: esp32-router-firmware
-        path: build/*.bin
+        path: build/**/*.bin
         retention-days: 30
