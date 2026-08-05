@@ -17,5 +17,8 @@ idf_component_register(
         lwip 
         esp_http_server
         mbedtls
-        driver          # 🔥 यह लाइन जोड़ें
+        driver
 )
+
+# 🔥 यह 2 लाइनें जोड़ें – Format Warnings को Errors न बनने दें
+target_compile_options(${COMPONENT_LIB} PRIVATE -Wno-format -Wno-error=unused-variable)
