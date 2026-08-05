@@ -10,7 +10,6 @@
 #include "lwip/lwip_napt.h"
 #include "lwip/ip4_addr.h"
 #include "lwip/netif.h"
-// #include "lwip/dhcps.h"   // ← यह Include हटा दिया गया
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
@@ -176,12 +175,9 @@ static void wifi_event_handler(void *arg, esp_event_base_t base,
             atomic_store(&g_router.sta_connected, false);
             
             if (atomic_load(&g_router.nat_enabled)) {
-                struct netif *ap_lwip = (struct netif *)esp_netif_get_netif_impl(s_ap_netif);
-                if (ap_lwip) {
-                    ip_napt_enable_netif(ap_lwip, 0);
-                    atomic_store(&g_router.nat_enabled, false);
-                    ESP_LOGI(TAG, "NAPT disabled");
-                }
+                ip_napt_enable_netif(esp_netif_get_netif_impl(s_ap_netif), 0);
+                atomic_store(&g_router.nat_enabled, false);
+                ESP_LOGI(TAG, "NAPT disabled");
             }
             led_set(LED_BLINK_SLOW);
             break;
@@ -191,6 +187,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t base,
             atomic_fetch_add(&g_router.sta_clients, 1);
             ESP_LOGI(TAG, "Client joined: " MACSTR " (total %d)",
                      MAC2STR(d->mac), (int)atomic_load(&g_router.sta_clients));
+            (void)d; // unused variable को शांत करें
             break;
         }
         case WIFI_EVENT_AP_STADISCONNECTED: {
@@ -199,6 +196,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t base,
                 atomic_fetch_sub(&g_router.sta_clients, 1);
             ESP_LOGI(TAG, "Client left: " MACSTR " (total %d)",
                      MAC2STR(d->mac), (int)atomic_load(&g_router.sta_clients));
+            (void)d; // unused variable को शांत करें
             break;
         }
         default: break;
@@ -209,18 +207,16 @@ static void wifi_event_handler(void *arg, esp_event_base_t base,
         atomic_store(&sta_connecting, false);
         atomic_store(&g_router.sta_connected, true);
         
-        struct netif *ap_lwip = (struct netif *)esp_netif_get_netif_impl(s_ap_netif);
-        if (ap_lwip) {
-            ip_napt_enable_netif(ap_lwip, 1);
-            atomic_store(&g_router.nat_enabled, true);
-            ESP_LOGI(TAG, "NAPT enabled");
-        }
+        ip_napt_enable_netif(esp_netif_get_netif_impl(s_ap_netif), 1);
+        atomic_store(&g_router.nat_enabled, true);
+        ESP_LOGI(TAG, "NAPT enabled");
+        
         led_set(LED_ON_SOLID);
         xEventGroupSetBits(s_wifi_event_group, STA_GOT_IP_BIT);
     }
 }
 
-// ---------- AP नेटिफ सेटअप (DHCP Lease Range हटा दी गई – डिफ़ॉल्ट का उपयोग करें) ----------
+// ---------- AP नेटिफ सेटअप ----------
 static void setup_ap_netif(void) {
     char ap_ip_buf[16];
     atomic_str_get(g_router.ap_ip, ap_ip_buf, sizeof(ap_ip_buf));
@@ -232,7 +228,6 @@ static void setup_ap_netif(void) {
 
     esp_netif_dhcps_stop(s_ap_netif);
     esp_netif_set_ip_info(s_ap_netif, &ip_info);
-    // DHCP Server डिफ़ॉल्ट Lease Range (subnet.2 – subnet.254) स्वतः लागू हो जाती है
     esp_netif_dhcps_start(s_ap_netif);
     ESP_LOGI(TAG, "AP DHCP started with default range (based on AP IP)");
 }
@@ -304,7 +299,7 @@ esp_err_t router_core_init(void) {
     cfg.ampdu_rx_enable    = 1;
     cfg.ampdu_tx_enable    = 1;
     cfg.nvs_enable         = 0;
-    cfg.rx_ba_win = 32;   // केवल rx_ba_win मौजूद है
+    cfg.rx_ba_win = 32;
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
 
     ESP_ERROR_CHECK(esp_event_handler_instance_register(
