@@ -10,6 +10,7 @@
 #include "lwip/lwip_napt.h"
 #include "lwip/ip4_addr.h"
 #include "lwip/netif.h"
+#include "lwip/dhcps.h"          // 🔥 यह Include जोड़ा गया है
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
@@ -26,12 +27,11 @@ static EventGroupHandle_t s_wifi_event_group;
 static esp_netif_t *s_sta_netif = NULL;
 static esp_netif_t *s_ap_netif  = NULL;
 
-// 🔥 FIX #17: कनेक्शन प्रयास को ट्रैक करने के लिए एटॉमिक फ्लैग
 static atomic_bool sta_connecting = false;
 
 router_config_t g_router = {0};
 
-// ---------- NVS हेल्पर (atomic_str_get/set) ----------
+// ---------- NVS हेल्पर ----------
 static void nvs_get_str_atomic(nvs_handle_t nvs, const char *key, atomic_char *dst, size_t len) {
     char tmp[64] = {0};
     size_t sz = len;
@@ -48,9 +48,8 @@ static void nvs_set_str_atomic(nvs_handle_t nvs, const char *key, atomic_char *s
     nvs_set_str(nvs, key, tmp);
 }
 
-// ---------- NVS फंक्शन्स (🔥 FIX #16: पहले डिफ़ॉल्ट सेट करें) ----------
+// ---------- NVS फंक्शन्स ----------
 void nvs_config_load(void) {
-    // 1. हमेशा पहले पूरी तरह से डिफ़ॉल्ट मान सेट करें (ताकि किसी भी एरर पर AP चालू रहे)
     atomic_str_set(g_router.sta_ssid, "", sizeof(g_router.sta_ssid));
     atomic_str_set(g_router.sta_pass, "", sizeof(g_router.sta_pass));
     atomic_str_set(g_router.ap_ssid, DEFAULT_AP_SSID, sizeof(g_router.ap_ssid));
@@ -71,10 +70,9 @@ void nvs_config_load(void) {
         } else {
             ESP_LOGW(TAG, "No saved config, using defaults");
         }
-        return; // डिफ़ॉल्ट पहले से सेट हैं, सुरक्षित वापसी
+        return;
     }
 
-    // 2. NVS से मान पढ़ें (डिफ़ॉल्ट को ओवरराइड करें)
     nvs_get_str_atomic(nvs, "sta_ssid", g_router.sta_ssid, sizeof(g_router.sta_ssid));
     nvs_get_str_atomic(nvs, "sta_pass", g_router.sta_pass, sizeof(g_router.sta_pass));
     nvs_get_str_atomic(nvs, "ap_ssid",  g_router.ap_ssid,  sizeof(g_router.ap_ssid));
@@ -161,7 +159,7 @@ void url_encode(const char *src, char *dst, size_t dst_len) {
     dst[j] = '\0';
 }
 
-// ---------- इवेंट हैंडलर (🔥 FIX #17: sta_connecting फ्लैग सेट करें) ----------
+// ---------- इवेंट हैंडलर ----------
 static void wifi_event_handler(void *arg, esp_event_base_t base,
                                 int32_t id, void *data) {
     if (base == WIFI_EVENT) {
@@ -178,7 +176,6 @@ static void wifi_event_handler(void *arg, esp_event_base_t base,
             atomic_store(&g_router.sta_connected, false);
             
             if (atomic_load(&g_router.nat_enabled)) {
-                // 🔥 FIX: स्पष्ट Cast to struct netif*
                 struct netif *ap_lwip = (struct netif *)esp_netif_get_netif_impl(s_ap_netif);
                 if (ap_lwip) {
                     ip_napt_enable_netif(ap_lwip, 0);
@@ -212,7 +209,6 @@ static void wifi_event_handler(void *arg, esp_event_base_t base,
         atomic_store(&sta_connecting, false);
         atomic_store(&g_router.sta_connected, true);
         
-        // 🔥 FIX: स्पष्ट Cast to struct netif*
         struct netif *ap_lwip = (struct netif *)esp_netif_get_netif_impl(s_ap_netif);
         if (ap_lwip) {
             ip_napt_enable_netif(ap_lwip, 1);
@@ -251,7 +247,7 @@ static void setup_ap_netif(void) {
     ESP_LOGI(TAG, "AP DHCP range: " IPSTR " - " IPSTR, IP2STR(&lease.start_ip), IP2STR(&lease.end_ip));
 }
 
-// ---------- परफॉर्मेंस ट्यूनिंग (🔥 FIX #2: BA_WIN फंक्शन हटाए गए) ----------
+// ---------- परफॉर्मेंस ट्यूनिंग ----------
 static void apply_performance_tuning(void) {
     esp_wifi_set_ps(WIFI_PS_NONE);
     esp_wifi_set_max_tx_power(80);
@@ -263,17 +259,15 @@ static void apply_performance_tuning(void) {
         if (err_ap != ESP_OK) ESP_LOGW(TAG, "AP HT40 set failed (%d)", err_ap);
         if (err_sta != ESP_OK) ESP_LOGW(TAG, "STA HT40 set failed (%d)", err_sta);
     }
-    // 🔥 BA_WIN अब router_core_init() में cfg के माध्यम से सेट किया जा रहा है
-    ESP_LOGI(TAG, "Performance: PS_NONE, Tx=20dBm, BA_WIN configured via init config");
+    ESP_LOGI(TAG, "Performance: PS_NONE, Tx=20dBm");
 }
 
-// ---------- STA रीकनेक्ट टास्क (🔥 FIX #17: sta_connecting फ्लैग चेक करें) ----------
+// ---------- STA रीकनेक्ट टास्क ----------
 static void sta_reconnect_task(void *arg) {
     while (1) {
         char sta_ssid_buf[64];
         atomic_str_get(g_router.sta_ssid, sta_ssid_buf, sizeof(sta_ssid_buf));
 
-        // यदि DISCONNECTED है, कोई कनेक्शन प्रयास चल नहीं रहा, और SSID सेट है, तभी प्रयास करें
         if (!atomic_load(&g_router.sta_connected) && 
             !atomic_load(&sta_connecting) && 
             strlen(sta_ssid_buf) > 0) {
@@ -281,8 +275,6 @@ static void sta_reconnect_task(void *arg) {
             ESP_LOGI(TAG, "Reconnecting to STA...");
             esp_wifi_disconnect();
             vTaskDelay(pdMS_TO_TICKS(500));
-            
-            // कनेक्शन शुरू करने से पहले फ्लैग सेट करें
             atomic_store(&sta_connecting, true);
             esp_wifi_connect();
             
@@ -296,7 +288,6 @@ static void sta_reconnect_task(void *arg) {
                 ESP_LOGI(TAG, "Reconnect successful");
             } else {
                 ESP_LOGW(TAG, "Reconnect failed, will retry...");
-                // फ्लैग को मैन्युअल क्लियर करें (इवेंट से भी क्लियर होगा, पर सुरक्षा के लिए)
                 atomic_store(&sta_connecting, false);
             }
         }
@@ -323,9 +314,7 @@ esp_err_t router_core_init(void) {
     cfg.ampdu_rx_enable    = 1;
     cfg.ampdu_tx_enable    = 1;
     cfg.nvs_enable         = 0;
-    // 🔥 FIX #2: BA_WIN को cfg के माध्यम से सेट करें – केवल rx_ba_win मौजूद है
-    cfg.rx_ba_win = 32;
-    // ⚠️ tx_ba_win हटा दिया गया क्योंकि यह ESP-IDF v5.x में मौजूद नहीं है
+    cfg.rx_ba_win = 32;   // केवल rx_ba_win मौजूद है (tx_ba_win हटा दिया)
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
 
     ESP_ERROR_CHECK(esp_event_handler_instance_register(
@@ -379,7 +368,7 @@ esp_err_t router_core_init(void) {
     if (strlen(sta_ssid_buf) > 0) {
         ESP_LOGI(TAG, "Connecting to '%s'...", sta_ssid_buf);
         led_set(LED_BLINK_FAST);
-        atomic_store(&sta_connecting, true); // पहला प्रयास शुरू
+        atomic_store(&sta_connecting, true);
         xEventGroupClearBits(s_wifi_event_group, STA_GOT_IP_BIT);
         EventBits_t bits = xEventGroupWaitBits(
             s_wifi_event_group,
