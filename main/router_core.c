@@ -178,7 +178,8 @@ static void wifi_event_handler(void *arg, esp_event_base_t base,
             atomic_store(&g_router.sta_connected, false);
             
             if (atomic_load(&g_router.nat_enabled)) {
-                struct netif *ap_lwip = esp_netif_get_netif_impl(s_ap_netif);
+                // 🔥 FIX: स्पष्ट Cast to struct netif*
+                struct netif *ap_lwip = (struct netif *)esp_netif_get_netif_impl(s_ap_netif);
                 if (ap_lwip) {
                     ip_napt_enable_netif(ap_lwip, 0);
                     atomic_store(&g_router.nat_enabled, false);
@@ -192,7 +193,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t base,
             wifi_event_ap_staconnected_t *d = (wifi_event_ap_staconnected_t *)data;
             atomic_fetch_add(&g_router.sta_clients, 1);
             ESP_LOGI(TAG, "Client joined: " MACSTR " (total %d)",
-                     MAC2STR(d->mac), atomic_load(&g_router.sta_clients));
+                     MAC2STR(d->mac), (int)atomic_load(&g_router.sta_clients));
             break;
         }
         case WIFI_EVENT_AP_STADISCONNECTED: {
@@ -200,7 +201,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t base,
             if (atomic_load(&g_router.sta_clients) > 0)
                 atomic_fetch_sub(&g_router.sta_clients, 1);
             ESP_LOGI(TAG, "Client left: " MACSTR " (total %d)",
-                     MAC2STR(d->mac), atomic_load(&g_router.sta_clients));
+                     MAC2STR(d->mac), (int)atomic_load(&g_router.sta_clients));
             break;
         }
         default: break;
@@ -211,7 +212,8 @@ static void wifi_event_handler(void *arg, esp_event_base_t base,
         atomic_store(&sta_connecting, false);
         atomic_store(&g_router.sta_connected, true);
         
-        struct netif *ap_lwip = esp_netif_get_netif_impl(s_ap_netif);
+        // 🔥 FIX: स्पष्ट Cast to struct netif*
+        struct netif *ap_lwip = (struct netif *)esp_netif_get_netif_impl(s_ap_netif);
         if (ap_lwip) {
             ip_napt_enable_netif(ap_lwip, 1);
             atomic_store(&g_router.nat_enabled, true);
@@ -321,9 +323,9 @@ esp_err_t router_core_init(void) {
     cfg.ampdu_rx_enable    = 1;
     cfg.ampdu_tx_enable    = 1;
     cfg.nvs_enable         = 0;
-    // 🔥 FIX #2: BA_WIN को cfg के माध्यम से सेट करें (ESP-IDF v5.x का सही तरीका)
+    // 🔥 FIX #2: BA_WIN को cfg के माध्यम से सेट करें – केवल rx_ba_win मौजूद है
     cfg.rx_ba_win = 32;
-    cfg.tx_ba_win = 32;
+    // ⚠️ tx_ba_win हटा दिया गया क्योंकि यह ESP-IDF v5.x में मौजूद नहीं है
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
 
     ESP_ERROR_CHECK(esp_event_handler_instance_register(
