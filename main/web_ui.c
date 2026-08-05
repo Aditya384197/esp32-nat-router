@@ -197,14 +197,18 @@ static esp_err_t handle_status(httpd_req_t *req) {
     return ESP_OK;
 }
 
-// ---------- कॉन्फ़िग GET ----------
+// ---------- कॉन्फ़िग GET (🔥 FIX #1: httpd_req_get_url_query_str) ----------
 static esp_err_t handle_config_get(httpd_req_t *req) {
     if (!check_auth(req)) return ESP_OK;
 
     char buf[4096];
     char prefill_ssid[64] = "";
-    const char *query = httpd_req_get_url_query(req);
-    if (query) {
+    char query_buf[128];
+    const char *query = NULL;
+    
+    // 🔥 FIX #1: सही API उपयोग करें
+    if (httpd_req_get_url_query_str(req, query_buf, sizeof(query_buf)) == ESP_OK) {
+        query = query_buf;
         char param[64];
         if (httpd_query_key_value(query, "ssid", param, sizeof(param)) == ESP_OK) {
             url_decode(prefill_ssid, param, sizeof(prefill_ssid));
@@ -277,7 +281,7 @@ static esp_err_t handle_config_get(httpd_req_t *req) {
     return ESP_OK;
 }
 
-// ---------- कॉन्फ़िग POST ----------
+// ---------- कॉन्फ़िग POST (🔥 FIX #2: sta_pass_tmp हटाया) ----------
 static esp_err_t handle_config_post(httpd_req_t *req) {
     if (!check_auth(req)) return ESP_OK;
 
@@ -291,7 +295,7 @@ static esp_err_t handle_config_post(httpd_req_t *req) {
     body[received] = '\0';
 
     char tmp[64];
-    char sta_ssid_tmp[64], sta_pass_tmp[64];
+    char sta_ssid_tmp[64];   // 🔥 FIX #2: sta_pass_tmp हटा दिया
     get_param(body, "sta_ssid", sta_ssid_tmp, sizeof(sta_ssid_tmp));
     atomic_str_set(g_router.sta_ssid, sta_ssid_tmp, sizeof(g_router.sta_ssid));
     get_param(body, "sta_pass", tmp, sizeof(tmp));
@@ -338,7 +342,7 @@ static esp_err_t handle_config_post(httpd_req_t *req) {
     return ESP_OK;
 }
 
-// ---------- स्कैन हैंडलर ----------
+// ---------- स्कैन हैंडलर (🔥 FIX #3: row बफर 512) ----------
 static esp_err_t handle_scan(httpd_req_t *req) {
     if (!check_auth(req)) return ESP_OK;
 
@@ -379,7 +383,8 @@ static esp_err_t handle_scan(httpd_req_t *req) {
                 "<th align='left'>SSID</th><th>Ch</th><th>RSSI</th><th>Security</th><th>Select</th>"
                 "</tr>");
 
-            char row[256];
+            // 🔥 FIX #3: row बफर 256 → 512
+            char row[512];
             for (int i = 0; i < ap_count; i++) {
                 const char *auth = "OPEN";
                 switch (list[i].authmode) {
