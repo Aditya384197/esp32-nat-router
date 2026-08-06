@@ -237,7 +237,7 @@ static void setup_ap_netif(void) {
 // ---------- परफॉर्मेंस ट्यूनिंग ----------
 static void apply_performance_tuning(void) {
     esp_wifi_set_ps(WIFI_PS_NONE);
-    esp_wifi_set_max_tx_power(80);
+    esp_wifi_set_max_tx_power(84);
     // 🔥 नीचे 2 लाइनों में WIFI_BW_HT40 को WIFI_BW40 से बदलें
     esp_err_t err_ap = esp_wifi_set_bandwidth(WIFI_IF_AP, WIFI_BW40);
     esp_err_t err_sta = esp_wifi_set_bandwidth(WIFI_IF_STA, WIFI_BW40);
